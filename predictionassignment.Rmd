@@ -394,5 +394,5 @@ Levels: A B C D E
 + }
 + }
 > pml_write_files(as.character(predanswers))
-> 
+>   
 > 
