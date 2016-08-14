@@ -1,0 +1,97 @@
+---
+title: "Predictionassignment"
+author: "Mohebujjaman"
+date: "August 14, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+setInternet2(TRUE)
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+ptrain <- read.csv('pml-training.csv')
+ptest <- read.csv('pml-testing.csv')
+library(caret)
+library(ggplot2)
+library(lattice)
+library(kernlab)
+library(randomForest)
+str(ptrain)
+str(ptest)
+
+intrain <- createDataPartition(pmltrain$classe,p=.9,list=FALSE)
+traindata = ptrain[intrain,]
+testdata = ptrain[-intrain,]
+set.seed(32598)
+zzz <- nearZeroVar(traindata)
+trainz <- traindata[-zzz]
+testz <- testdata[-zzz]
+ptestz <- ptest[-zzz]
+
+dim(trainz)
+ftridx <- which(lapply(trainz,class) %in% c('numeric'))
+trainz1 <- preProcess(trainz[,ftridx], method=c('knnImpute'))
+ftridx
+trainz1
+pred1 <- predict(trainz1, trainz[,ftridx])
+predtrain <- cbind(trainz$classe,pred1)
+names(predtrain)[1] <- 'classe'
+predtrain[is.na(predtrain)] <- 0
+
+pred2 <- predict(trainz1, testz[,ftridx])
+predtest <- cbind(testz$classe, pred2)
+names(predtest)[1] <- 'classe'
+predtest[is.na(predtest)] <- 0
+
+predptest <- predict(trainz1,ptestz[,ftridx] )
+
+
+dim(predtrain)
+#mod1 <- train(classe ~ ., method="glm",data=predtrain)
+#mod2 <- train(classe ~ ., method="rf",data=predtrain,trControl=trainControl(method="cv"),number=3)
+#mod1 <- glm(classe ~ .,predtrain)
+#mod1 <- glm.fit(classe ~ .,predtrain)
+model <- randomForest(classe~.,data=predtrain)
+
+predictiontraina <- predict(model, predtrain) 
+print(table(predictiontraina, predtrain$classe))
+training <- as.data.frame(table(predictiontraina, predtrain$classe))
+
+predictiontesta <- predict(model, predtest) 
+print(table(predictiontesta, predtest$classe))
+str(predptest)
+predanswers <- predict(model, predptest) 
+predanswers
+predanswers <- predict(model, predptest) 
+predanswers
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(as.character(predanswers))
+
