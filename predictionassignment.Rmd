@@ -69,10 +69,6 @@ predptest <- predict(trainz1,ptestz[,ftridx] )
 
 
 dim(predtrain)
-#mod1 <- train(classe ~ ., method="glm",data=predtrain)
-#mod2 <- train(classe ~ ., method="rf",data=predtrain,trControl=trainControl(method="cv"),number=3)
-#mod1 <- glm(classe ~ .,predtrain)
-#mod1 <- glm.fit(classe ~ .,predtrain)
 model <- randomForest(classe~.,data=predtrain)
 
 predictiontraina <- predict(model, predtrain) 
@@ -89,7 +85,7 @@ predanswers
 pml_write_files = function(x){
   n = length(x)
   for(i in 1:n){
-    filename = paste0("problem_id_",i,".txt")
+    filename = paste("problem_id_",i,".txt")
     write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
   }
 }
