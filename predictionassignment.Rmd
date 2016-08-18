@@ -1,0 +1,229 @@
+---
+title: "PredictionAssignment"
+author: "Mohebujjaman"
+date: "August 14, 2016"
+output: html_document
+---
+
+**Background**
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+**Data**
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+##download files
+
+
+```{r}
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+
+```
+To read the training and testing data, we download the two data sets
+
+```{r}
+ptrain <- read.csv('pml-training.csv')
+ptest <- read.csv('pml-testing.csv')
+```
+
+loading packages, libraries and setting seed.
+```{r}
+library(caret)
+library(ggplot2)
+library(lattice)
+library(kernlab)
+library(randomForest)
+```
+```{r}
+str(ptrain)
+str(ptest)
+```
+Splitting the data set into a 70% training and 30% testing and creating validation set
+
+```{r}
+intrain <- createDataPartition(ptrain$classe,p=.7,list=FALSE)
+traindata = ptrain[intrain,]
+testdata = ptrain[-intrain,]
+```
+Setting the seed
+```{r}
+set.seed(32598)
+```
+Removing the absolutely small data
+```{r}
+zzz <- nearZeroVar(traindata)
+trainz <- traindata[-zzz]
+testz <- testdata[-zzz]
+ptestz <- ptest[-zzz]
+
+dim(trainz)
+## [1] 13737   104
+
+tridx <- which(lapply(trainz,class) %in% c('numeric'))
+trainz1 <- preProcess(trainz[,tridx], method=c('knnImpute'))
+tridx
+##[1]   7   8   9  11  13  15  17  18  19  20  21  22  23  24  25  26  27  28  29  36  37  ##38
+##[23]  40  41  42  43  50  52  55  56  57  58  59  60  61  62  63  65  66  67  68  69  70  71
+##[45]  72  73  74  75  76  77  83  84  85  86  87  88  89  90  91  92  94  95  96  97 102 103
+trainz1
+
+## Created from 293 samples and 66 variables
+
+##Pre-processing:
+##  - centered (66)
+##  - ignored (0)
+##  - 5 nearest neighbor imputation (66)
+##  - scaled (66)
+
+pred1 <- predict(trainz1, trainz[,tridx])
+predtrain <- cbind(trainz$classe,pred1)
+names(predtrain)[1] <- 'classe'
+predtrain[is.na(predtrain)] <- 0
+
+pred2 <- predict(trainz1, testz[,tridx])
+predtest <- cbind(testz$classe, pred2)
+names(predtest)[1] <- 'classe'
+predtest[is.na(predtest)] <- 0
+
+predptest <- predict(trainz1,ptestz[,tridx] )
+
+
+dim(predtrain)
+
+##[1] 13737    67
+## Modeling
+model <- randomForest(classe~.,data=predtrain)
+
+predictiontraina <- predict(model, predtrain) 
+print(table(predictiontraina, predtrain$classe))
+
+## predictiontraina    A    B    C    D    E
+##            A 3906    0    0    0    0
+##            B    0 2658    0    0    0
+##            C    0    0 2396    0    0
+##            D    0    0    0 2252    0
+##            E    0    0    0    0 2525
+print(confusionMatrix(predictiontraina,predtrain$classe))
+training <- as.data.frame(table(predictiontraina, predtrain$classe))
+```
+Validation set Accuracy ( Out of sample error)
+```{r}
+predictiontesta <- predict(model, predtest) 
+print(table(predictiontesta, predtest$classe))
+
+## predictiontesta    A    B    C    D    E
+##          A 1664   17    1    0    4
+##          B    5 1104   16    0    3
+##          C    3   12 1000   12    7
+##          D    1    4    9  952    3
+##          E    1    2    0    0 1065
+
+print(confusionMatrix(predictiontesta,predtest$classe))
+```
+Therefore the cross validation accuracy is 98.6% and the out of sample error is 1.4%. Hence model does good prediction.
+```{r}
+str(predptest)
+
+# 'data.frame':	20 obs. of  66 variables:
+#  $ roll_belt               : num  0.934 -1.011 -1.013 0.965 -1.005 ...
+#  $ pitch_belt              : num  1.192 0.2 0.063 -1.884 0.131 ...
+#  $ yaw_belt                : num  0.0718 -0.8149 -0.8107 1.8289 -0.8117 ...
+#  $ max_roll_belt           : num  0.0606 -0.8579 -0.8564 1.8757 -0.8488 ...
+#  $ min_roll_belt           : num  0.0939 -0.8232 -0.8204 1.8991 -0.8318 ...
+#  $ amplitude_roll_belt     : num  -0.0998 -0.1358 -0.1398 -0.0091 -0.0812 ...
+#  $ var_total_accel_belt    : num  -0.31397 -0.33483 -0.36613 -0.34527 0.00945 ...
+#  $ avg_roll_belt           : num  0.869 -1.071 -1.076 0.932 -1.058 ...
+#  $ stddev_roll_belt        : num  -0.395 -0.428 -0.453 -0.32 0.238 ...
+#  $ var_roll_belt           : num  -0.3059 -0.3084 -0.3093 -0.289 0.0298 ...
+#  $ avg_pitch_belt          : num  1.086 0.1481 0.1382 -1.9333 0.0832 ...
+#  $ stddev_pitch_belt       : num  -0.504 0.105 -0.12 0.105 1.066 ...
+#  $ var_pitch_belt          : num  -0.3591 -0.0995 -0.2575 0.0585 1.2889 ...
+#  $ avg_yaw_belt            : num  0.0825 -0.8447 -0.8425 1.9023 -0.8473 ...
+#  $ stddev_yaw_belt         : num  -0.0958 -0.1223 -0.1256 -0.0248 -0.076 ...
+#  $ var_yaw_belt            : num  -0.0761 -0.0762 -0.0762 -0.0744 -0.0755 ...
+#  $ gyros_belt_x            : num  -2.398 -0.26 0.274 0.566 0.177 ...
+#  $ gyros_belt_y            : num  -0.761 -0.761 -0.255 0.882 -0.255 ...
+#  $ gyros_belt_z            : num  -1.346 0.242 0.65 -0.124 0.527 ...
+#  $ roll_arm                : num  0.308 -0.25 -0.25 -1.745 0.794 ...
+#  $ pitch_arm               : num  -0.751 0.163 0.163 1.969 0.253 ...
+#  $ yaw_arm                 : num  2.5151 0.0148 0.0148 -1.9799 1.4476 ...
+#  $ var_accel_arm           : num  0.7668 -0.2848 -0.0143 -0.4081 0.0522 ...
+#  $ gyros_arm_x             : num  -0.8413 -0.6014 1.0329 0.0933 -0.9963 ...
+#  $ gyros_arm_y             : num  0.859 1.292 -1.298 -0.302 1.222 ...
+#  $ gyros_arm_z             : num  -0.816 -1.268 1.551 1.171 -1.467 ...
+#  $ max_picth_arm           : num  0.922 -0.476 -0.476 -1.201 0.315 ...
+#  $ min_pitch_arm           : num  0.664 0.58 0.58 -0.96 0.398 ...
+#  $ roll_dumbbell           : num  -0.597 0.435 0.472 0.273 -1.791 ...
+#  $ pitch_dumbbell          : num  0.963 -1.159 -1.096 -0.521 -1.152 ...
+#  $ yaw_dumbbell            : num  1.512 -0.94 -0.936 -1.278 -0.195 ...
+#  $ max_roll_dumbbell       : num  0.741 -0.93 -0.986 -0.763 -0.308 ...
+#  $ max_picth_dumbbell      : num  1.149 -0.991 -0.985 -1.318 -0.127 ...
+#  $ min_roll_dumbbell       : num  1.54 -0.435 -0.554 0.111 -0.238 ...
+#  $ min_pitch_dumbbell      : num  1.817 -0.695 -0.699 -1.02 -0.136 ...
+#  $ amplitude_roll_dumbbell : num  -0.332 -0.567 -0.541 -0.773 -0.126 ...
+#  $ amplitude_pitch_dumbbell: num  -0.4201 -0.61 -0.5973 -0.704 -0.0253 ...
+#  $ var_accel_dumbbell      : num  -0.236 -0.17 -0.174 -0.262 -0.124 ...
+#  $ avg_roll_dumbbell       : num  -0.362 0.724 0.651 0.376 -0.3 ...
+#  $ stddev_roll_dumbbell    : num  -0.329 -0.513 -0.498 -0.601 0.1 ...
+#  $ var_roll_dumbbell       : num  -0.372 -0.404 -0.4 -0.425 0.325 ...
+#  $ avg_pitch_dumbbell      : num  1.304 -0.931 -1.026 -0.528 -0.157 ...
+#  $ stddev_pitch_dumbbell   : num  -0.356 -0.5 -0.579 -0.751 -0.223 ...
+#  $ var_pitch_dumbbell      : num  -0.402 -0.424 -0.458 -0.489 -0.165 ...
+#  $ avg_yaw_dumbbell        : num  1.584 -0.898 -0.93 -1.288 -0.25 ...
+#  $ stddev_yaw_dumbbell     : num  -0.442 -0.585 -0.5715 -0.6606 -0.0753 ...
+#  $ var_yaw_dumbbell        : num  -0.3959 -0.4212 -0.4115 -0.4336 -0.0675 ...
+#  $ gyros_dumbbell_x        : num  0.2713 0.1032 0.1312 -0.0312 0.0752 ...
+#  $ gyros_dumbbell_y        : num  0.01937 0.00423 0.14048 -0.10174 -0.783 ...
+#  $ gyros_dumbbell_z        : num  -0.179 -0.2157 -0.0799 0.0632 -0.124 ...
+#  $ magnet_dumbbell_z       : num  -0.7225 -0.5793 -0.0279 0.058 1.9127 ...
+#  $ roll_forearm            : num  0.995 0.698 0.903 -0.314 -1.948 ...
+#  $ pitch_forearm           : num  1.375 -1.007 -1.542 -0.381 -0.457 ...
+#  $ yaw_forearm             : num  1.324 0.841 0.715 -0.185 -0.648 ...
+#  $ max_roll_forearm        : num  0.766 -0.283 0.136 -0.785 0.265 ...
+#  $ max_picth_forearm       : num  0.621 0.513 0.615 -0.84 0.499 ...
+#  $ min_roll_forearm        : num  0.1392 -0.8484 -0.8268 0.0333 0.3605 ...
+#  $ min_pitch_forearm       : num  0.783 0.748 0.315 0.513 -0.68 ...
+#  $ amplitude_roll_forearm  : num  0.80085 0.41593 0.90261 -0.97882 -0.00216 ...
+#  $ amplitude_pitch_forearm : num  -0.187 -0.231 0.166 -0.945 0.848 ...
+#  $ var_accel_forearm       : num  -0.667 -0.312 -0.568 -0.837 0.289 ...
+#  $ gyros_forearm_x         : num  0.8862 1.4642 0.0345 1.8597 -1.38 ...
+#  $ gyros_forearm_y         : num  -1 -0.837 -0.255 0.178 0.883 ...
+#  $ gyros_forearm_z         : num  -0.3607 -0.1616 0.0618 0.7999 0.3143 ...
+#  $ magnet_forearm_y        : num  0.0839 0.8121 0.63 0.7964 -2.2766 ...
+#  $ magnet_forearm_z        : num  0.607 1.304 1.059 0.346 -0.823 ...
+```
+Prediction on the Test Set
+```{r}
+predanswers <- predict(model, predptest) 
+predanswers
+## Results
+# 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
+#  B  A  B  A  A  E  D  B  A  A  B  C  B  A  E  E  A  B  B  B 
+# Levels: A B C D E
+```
+We want to save now our outputs according to the instructions.
+```{r}
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(as.character(predanswers))
+
+```
+
+
